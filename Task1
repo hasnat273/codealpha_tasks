@@ -1,0 +1,76 @@
+# Import scapy libraries
+from scapy.all import sniff
+
+# Define a callback function to process captured packets
+def packet_callback(packet):
+    # Display the captured packet's summary
+    print(packet.summary())
+
+# Capture packets on your network interface (iface argument might be required on Windows)
+def start_sniffing(interface=None):
+    if interface:
+        sniff(iface=interface, prn=packet_callback, store=0)
+    else:
+        sniff(prn=packet_callback, store=0)  # Sniff on default interface
+
+if __name__ == "__main__":
+    # You can specify the interface to sniff on (e.g., 'Wi-Fi' or 'Ethernet')
+    
+    start_sniffing()  # Replace with `start_sniffing('Wi-Fi')` if needed
+
+
+
+#1 option  Analyzing Captured Packets
+
+
+def packet_callback(packet):
+    print(f"Source: {packet[0][1].src}, Destination: {packet[0][1].dst}, Protocol: {packet[0][1].proto}")
+
+
+
+#2 option  Optional - Using Raw Sockets
+
+
+import socket
+import struct
+
+# Create a raw socket to capture all network packets
+s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
+
+# Bind to the local machine (e.g., 0.0.0.0 to listen on all interfaces)
+s.bind(("0.0.0.0", 0))
+
+# Include IP headers in the captured packets
+s.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+
+# Put the network card into promiscuous mode (Windows-specific)
+s.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+
+# Function to parse the packet's content
+def parse_packet(packet):
+    # Parse Ethernet header and IP header from the packet
+    eth_header = packet[:14]
+    ip_header = packet[14:34]
+    
+    # Unpack IP header to extract source and destination IPs
+    ip_hdr = struct.unpack("!BBHHHBBH4s4s", ip_header)
+    
+    src_ip = socket.inet_ntoa(ip_hdr[8])
+    dst_ip = socket.inet_ntoa(ip_hdr[9])
+    
+    print(f"Source IP: {src_ip}, Destination IP: {dst_ip}")
+
+# Capture packets in a loop
+while True:
+    packet = s.recvfrom(65565)[0]
+    parse_packet(packet)
+
+
+
+#3 option  Optional - Analyzing Specific Protocols (TCP, UDP)
+
+def analyze_packet(packet):
+    if packet.haslayer(TCP):
+        print(f"TCP Packet - Source Port: {packet[TCP].sport}, Destination Port: {packet[TCP].dport}")
+    elif packet.haslayer(UDP):
+        print(f"UDP Packet - Source Port: {packet[UDP].sport}, Destination Port: {packet[UDP].dport}")
